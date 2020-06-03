@@ -1,0 +1,28 @@
+compound layer = monecules
+
+partslayer is multipurpose, depends on linking layer
+
+
+linking layer is pairs of 0-256 numbers
+
+first in pair defines part
+second defines what that part connects to
+
+
+both in pair refer to a location in the parts layer
+idx = 7*number
+
+0->7*256
+
+the 1st points to seven 0-256 numbers
+0: comp. to jump to in compound layer, this is the structure of the part
+1: % length of comp is the size of the critical region
+2: % number of extant part types (hardcoded, depends on what i get done) is what part it is, possibly weighted
+3: metadata of part
+4: more metadata?
+6 and 7 tbd. maybe dont need this many
+
+the 2nd points to some number of numbers
+0: % 8 or something, defines whether this part will connect to some # more new parts, reach backwards and connect to some # of parts already built, or just end
+1-2: either direction of reach and length of reach, or the product of #1%7 and #2%7 is the number of hops forward that we take to find the next connecting link section
+repeat as per the number of connections specified by #0
