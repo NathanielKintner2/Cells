@@ -6,6 +6,7 @@ using namespace Universe;
 std::vector<Sector> Universe::worldHexes(0);
 std::vector<Element> Universe::ptable(0);
 std::vector<Organism*> Universe::allLife(0);
+std::vector<Organism*> Universe::newLife(0);
 typedef std::unordered_map<char, Element> hashElement;
 hashElement Universe::ptableHash;
 
@@ -76,4 +77,28 @@ Compound& Universe::getByRelation(int& editSector, int& editSquare, int directio
 	}
 	return Universe::worldHexes[editSector].solution[editSquare];
 		
+}
+
+Sector& Universe::getSectorAtLocation(int xpos, int ypos)
+{
+	int x = xpos / Universe::sectorPixels;
+	if (x >= Universe::numxsectors)
+	{
+		x = Universe::numxsectors - 1;
+	}
+	if (x < 0)
+	{
+		x = 0;
+	}
+	int y = ypos / Universe::sectorPixels;
+	if (y >= Universe::numysectors)
+	{
+		y = Universe::numysectors - 1;
+	}
+	if (y < 0)
+	{
+		y = 0;
+	}
+	Sector& s = Universe::worldHexes[x + y * Universe::numxsectors];
+	return s;
 }

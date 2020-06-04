@@ -54,19 +54,12 @@ Organism* ParseCode(std::string code)
 	//get the compound section
 	std::stringstream code_input(code);
 	std::getline(code_input, chunk, '|');
-	std::stringstream compound_input(chunk);
 	std::string compound;
 	std::vector<Compound> allComps(0);
-	while (std::getline(compound_input, compound, ';'))
-	{
-		Compound newComp;
 
-		for (size_t i = 0; i < compound.size(); i++)
-		{
-			newComp.AddElementAtIndex(Universe::ptableHash[compound[i]], i);
-		}
-		allComps.emplace_back(newComp);
-	}
+	ParseComps(chunk, compound, allComps);
+
+
 	std::string sparts;
 	std::getline(code_input, sparts, '|');
 	unsigned char* parts;
@@ -77,13 +70,13 @@ Organism* ParseCode(std::string code)
 	links = (unsigned char*)slinks.c_str();
 
 	Organism* ret = new Organism();
-	Organelle* start = ParsePart(allComps, parts, links, 0);
+	ret->code = code;
+	Organelle* start = ParsePart(allComps, parts, links, 0, ret);
 
 	std::vector<int> pendingLinks(0);
 	pendingLinks.emplace_back(1);
 	ret->AllOrganelles.emplace_back(start);
 	ret->center = ret->AllOrganelles[0];
-	ret->center->parent = ret;
 	for (size_t idx = 0; idx < ret->AllOrganelles.size(); idx++)
 	{
 		//idx in links where this link is
@@ -114,9 +107,8 @@ Organism* ParseCode(std::string code)
 				{
 					break;
 				}
-				Organelle* newOrg = ParsePart(allComps, parts, links, currentlinkidx);
+				Organelle* newOrg = ParsePart(allComps, parts, links, currentlinkidx, ret);
 				ret->AllOrganelles.emplace_back(newOrg);
-				newOrg->parent = ret;
 				ret->AllOrganelles[idx]->ConnectTo(ret->AllOrganelles[ret->AllOrganelles.size() - 1]);
 				pendingLinks.emplace_back(currentlinkidx + 1);
 			}
@@ -130,15 +122,96 @@ Organism* ParseCode(std::string code)
 
 }
 
-Organelle* ParsePart(std::vector<Compound>& Compounds, unsigned char parts[], unsigned char links[], int idx)
+void ParseComps(std::string compound_chunk, std::string compound, std::vector<Compound>& allComps)
 {
-	Organelle* ret = new Organelle;
+	std::stringstream compound_input(compound_chunk);
+	while (std::getline(compound_input, compound, ';'))
+	{
+		Compound newComp;
+
+		for (size_t i = 0; i < compound.size(); i++)
+		{/* it will eventually be this slick
+			if (compound[i] < 50)// denotes an empty space
+			{
+				i += compound[i];
+			}*/
+			if (compound[i] == '!')//ew but fine for the moment
+			{
+				i++;
+			}
+			else
+			{
+				newComp.AddElementAtIndex(Universe::ptableHash[compound[i]], i);
+			}
+		}
+		allComps.emplace_back(newComp);
+	}
+}
+
+Organelle* ParsePart(std::vector<Compound>& Compounds, unsigned char parts[], unsigned char links[], int idx, Organism * parentPtr)
+{
+	//pointer to new organelle
+	Organelle* ret;
+	//where this parts details are located
 	unsigned char partIdx = links[idx];
-	ret->structure = Compounds[parts[partIdx]];
-	ret->criticalRegion = parts[partIdx + 1] % ret->structure.composition.size();
-	ret->metaData1 = parts[partIdx + 2];
-	ret->metaData2 = parts[partIdx + 3];
-	ret->metaData3 = parts[partIdx + 4];
-	ret->metaData4 = parts[partIdx + 5];
+	//this is the type of organelle
+	switch (parts[partIdx + 2] % 2)
+	{
+	case 0:
+		ret = new Factory;
+		break;
+	default:
+		ret = new Organelle;
+		break;
+	}
+	
+	ret->metaData1 = parts[partIdx + 3];
+	ret->metaData2 = parts[partIdx + 4];
+	ret->metaData3 = parts[partIdx + 5];
+	//         structure                 critical region
+	ret->init(Compounds[parts[partIdx]], parts[partIdx + 1] % Compounds[parts[partIdx]].composition.size() + 3, parentPtr);
+	//init called last to allow the organelle to access its metadata before decide how to initialize
 	return ret;
+}
+
+
+
+std::string MutateCode(std::string code)
+{
+	std::string chunk;
+	//get the compound section
+	std::stringstream code_input(code);
+	std::getline(code_input, chunk, '|');
+	std::string compound;
+	std::vector<Compound> allComps(0);
+
+	ParseComps(chunk, compound, allComps);
+
+	std::string sparts;
+	std::getline(code_input, sparts, '|');
+	unsigned char* parts;
+	parts = (unsigned char*)sparts.c_str();
+	std::string slinks;
+	std::getline(code_input, slinks, '|');
+	unsigned char* links;
+	links = (unsigned char*)slinks.c_str();
+	for (int i = rand() % 3; i > 0; i--)
+	{
+		parts[rand() % 256] = rand() % 256;
+		links[rand() % slinks.size()] = rand() % 256;
+	}
+	for (Compound c : allComps)
+	{
+		if (rand() % 20 == 0)
+		{
+			//PerformReactionIfGoodEnough(&structure, &c, rand() % 15 - 5, stability, ielem1, ielem2)
+		}
+	}
+	std::string ret = "";
+	for (Compound c : allComps)
+	{
+		ret += c.ChemicalString();
+		ret += ';';
+	}
+	return ret + "|" + std::string((char*)parts) + "|" + std::string((char*)links);
 }

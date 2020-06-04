@@ -3,7 +3,7 @@
 
 bool Compound::idxIsInOuterRingOrFarther(int idx)
 {    
-    return composition.size() - idx <= rings * 6;
+    return (int)(composition.size()) - idx <= rings * 6;
 }
 
 void Compound::AddElementAtIndex(Element e, int idx)
@@ -236,5 +236,28 @@ Compound* Compound::SplitCompound(int removeIdx, int& numPieces)
         ret[flagDests[flags[GroupMap[i]]]].AddElementAtIndex(composition[i], i);
     }
     delete[] GroupMap;
+    return ret;
+}
+
+std::string Compound::ChemicalString()//needs to be rewritten
+{
+    char buf[500];
+    int cursor = 0;
+    int target = composition.size(); //force optimization
+    int flag = 0;
+    for (int i = 0; i < target; i++)
+    {
+        if (composition[i].red == 0) //empty
+        {            
+            buf[cursor] = '!';
+            cursor++;
+        }
+        else
+        {
+            buf[cursor] = composition[i].name;
+            cursor++;
+        }
+    }
+    std::string ret = std::string(buf, cursor);
     return ret;
 }

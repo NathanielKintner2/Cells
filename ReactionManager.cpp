@@ -37,7 +37,7 @@ int AttemptReaction(std::vector<Compound>& initial, int threshold, std::vector<C
             else
             {
                 int numpieces = 0;
-                Compound* pieces = nullptr; //comp1.SplitCompound(ielem1, numpieces);
+                Compound* pieces = comp1.SplitCompound(ielem1, numpieces);
                 if (pieces == nullptr)
                 {
                     //there was no split, the reactants are still the same two compounds we started with
@@ -94,7 +94,8 @@ int AttemptReaction(std::vector<Compound>& initial, int threshold, std::vector<C
     return -1;
 }
 
-
+//NOTE: deleted compounds dont show up here.
+//we are going to lose a lot of energy to compounds with internal energy that just get deleted
 void AdjustEnergyValues(int stabilityChange, std::vector<Compound*>& reactants)
 {
     if (reactants.size() != 0)
@@ -147,6 +148,10 @@ bool PerformReactionIfGoodEnough(Compound* comp1, Compound* comp2, int threshold
 }
 
 
+//may eventually be changed to actually traverse the structure of a molecule and find a location on the outside.
+//however, the number of cycles that this would require to complete may simply make this untenable
+//fast and bad may be better than good but really slow? the goal is complex behaviour, if going faster lets us
+//achieve more progress, im all about it
 int FindElementIdxByFalling(Compound& c)
 {
     int ret;

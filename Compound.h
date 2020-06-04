@@ -43,6 +43,7 @@ public:
     sf::Color GetColor();
 
     Compound* SplitCompound(int removeIdx, int& numPieces);
+    std::string ChemicalString();
 
 private:
     void getPopulatedNeighbors(int idx);

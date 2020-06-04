@@ -47,17 +47,26 @@ int main()
         Universe::ptableHash[e.name] = e;
     }
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 5; i++)
     {
-        for (int j = 0; j < 1; j++)
+        for (int j = 0; j < 5; j++)
         {
             Organism* o;
-            do
+            while(true)
             {
                 std::string newcell = CreateRandomCode();
                 o = ParseCode(newcell);
                 std::cout << o->AllOrganelles.size() << std::endl;
-            } while (o->AllOrganelles.size() < 1 || o->AllOrganelles.size() > 24);
+                o->DoDeaths();
+                if (o->center == nullptr || o->AllOrganelles.size() < 6 || o->AllOrganelles.size() > 24)
+                {
+                    delete o;
+                }
+                else
+                {
+                    break;
+                }
+            }
 
             Universe::allLife.emplace_back(o);
 
@@ -99,8 +108,8 @@ int main()
 
     /* Your algorithm here */
 
-    for (int i = 0; i < 20000000; i++) //6.661 secs benchmark, debugging seems to take 140X longer or so (oof)
-    //for (int i = 0; i < 20000; i++)
+    //for (int i = 0; i < 20000000; i++) //6.661 secs benchmark, debugging seems to take 140X longer or so (oof)
+    for (int i = 0; i < 20000; i++)
     {
         std::vector<Compound*> asdf;
         AttemptReaction(env, 10, asdf);
@@ -145,10 +154,39 @@ int main()
             Sleep(1);
         }
         start = std::clock();
-
         for (Organism* o : Universe::allLife)
         {
             o->Reposition();
+            o->DoChemistry(reactants);
+            o->DoDeaths();
+            if (o->center != nullptr)
+            {
+                for (Organelle* oo : o->AllOrganelles)
+                {
+                    if (oo->structure.filledIndices.size() == 0)
+                    {
+                        int asdf = 123;
+                    }
+                }
+                o->DoActivations();
+            }
+        }
+        for (Organism* newO : Universe::newLife)
+        {
+            Universe::allLife.push_back(newO);
+        }
+        Universe::newLife.clear();
+        for (int i = 0; i < Universe::allLife.size();)
+        {
+            if (Universe::allLife[i]->center == nullptr)
+            {
+                delete Universe::allLife[i];
+                FastDelete(Universe::allLife, i);
+            }
+            else
+            {
+                ++i;
+            }
         }
         
         for (size_t i = 0; i < Universe::worldHexes.size(); i++)
@@ -177,6 +215,42 @@ int main()
             }
         }
         DisplayAll(window);
+
+        if (Universe::allLife.size() > 5)
+        {
+            continue;
+        }
+        for (int i = 0; i < 5; i++)
+        {
+            for (int j = 0; j < 5; j++)
+            {
+                Organism* o;
+                while (true)
+                {
+                    std::string newcell = CreateRandomCode();
+                    o = ParseCode(newcell);
+                    std::cout << o->AllOrganelles.size() << std::endl;
+                    o->DoDeaths();
+                    if (o->center == nullptr || o->AllOrganelles.size() < 6 || o->AllOrganelles.size() > 24)
+                    {
+                        delete o;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                Universe::allLife.emplace_back(o);
+
+
+                for (Organelle* oo : o->AllOrganelles)
+                {
+                    oo->xpos = 800 * i + rand() % 800;
+                    oo->ypos = 800 * j + rand() % 800;
+                }
+            }
+        }
     }
 
     return 0;

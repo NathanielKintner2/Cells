@@ -57,6 +57,9 @@
     <ClCompile Include="Organism.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Factory.cpp">
+      <Filter>OrganelleTypes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Display.h">

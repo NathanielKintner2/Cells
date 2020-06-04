@@ -14,10 +14,12 @@ namespace Universe
 	extern std::vector<Element> ptable;
 	extern std::unordered_map<char, Element> ptableHash;
 	extern std::vector<Organism*> allLife;
+	extern std::vector<Organism*> newLife;
 	void init(int numsectors, int sectorsize);
 	Compound& getByRelation(int& editSector, int& editSquare, int direction);
 	extern int numxsectors;
 	extern int numysectors;
 	extern int sectorPixels;
+	Sector& getSectorAtLocation(int x, int y);
 }
 

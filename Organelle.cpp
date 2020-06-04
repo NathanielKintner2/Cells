@@ -1,8 +1,22 @@
 #include "Organelle.h"
 #include "Organism.h"
 
+
+void Organelle::init(Compound struc, int crit, Organism * parentPtr)
+{
+	parent = parentPtr;
+	structure = struc;
+	criticalRegion = crit;
+	CriticalIdentity = GetCriticalCharge();
+	UtilityMarker = 0;
+}
+
 void Organelle::ConnectTo(Organelle* o)
 {
+	if (this == o)
+	{
+		return;
+	}
 	for (Organelle *oldO : connections)
 	{
 		if (oldO == o)
@@ -10,15 +24,50 @@ void Organelle::ConnectTo(Organelle* o)
 			return;
 		}
 	}
-	ConnectOneWay(o);
-	o->ConnectOneWay(this);
+	unsigned char metaData = o->ConnectOneWay(this, connections.size());
+	connections.emplace_back(o);
+	connectionMetaData.emplace_back(metaData);
 }
 
-void Organelle::ConnectOneWay(Organelle* o)
+//for a basic organelle, the connection metadata simply represents where the connection is sitting
+//in that organelle's connections vector. that way, when we want that organelle to disconnect from us,
+//they can send them their metadata so that they know exactly where to go to do the disconnect.
+//effectively, this makes disconnecting into an O(1) process. Instead of searching through the list of
+//connections to find us, we tell that organelle exactly where to find and delete us from their list
+unsigned char Organelle::ConnectOneWay(Organelle* o, unsigned char Metadata)
 {
-	connections.push_back(o);
+	unsigned char ret = connections.size();
+	connections.emplace_back(o);
+	connectionMetaData.emplace_back(Metadata);
+	return ret;
 }
 
+//severs all incoming connections, severing all outgoing connections is trivial and generally unnecessary
+void Organelle::SeverAllConnections()
+{
+	int target = connections.size();//force an optimization, we dont care if connections changes size
+	for (int i = 0; i < target; i++)
+	{
+		connections[i]->DisconnectOneWay(connectionMetaData[i]);
+	}
+}
+
+void Organelle::DisconnectOneWay(unsigned char Metadata)
+{
+	FastDelete(connections, Metadata);
+	FastDelete(connectionMetaData, Metadata);
+	if (connections.size() != Metadata)
+	{
+		//we just moved an entry, so if that entry tries to delete we will not be looking in the wrong place.
+		//we send them an updated piece of metadata so that they can find us and then change our delete metadata
+		connections[Metadata]->UpdateConnectionMetaData(connectionMetaData[Metadata], Metadata);
+	}
+}
+
+void Organelle::UpdateConnectionMetaData(unsigned char MetadataToFindEntry, unsigned char MetadataToChangeEntryTo)
+{
+	connectionMetaData[MetadataToFindEntry] = MetadataToChangeEntryTo;
+}
 
 void Organelle::SendRepositionRequests()
 {
@@ -101,8 +150,11 @@ void Organelle::Display(sf::RenderWindow& window, int zoom, int staticXOffset, i
 
 void Organelle::DoChemistry(std::vector<Compound*>& reactants)
 {
-	Sector s = Universe::worldHexes[xpos / Universe::sectorPixels + ypos / Universe::sectorPixels * Universe::numxsectors];
-	
+	Sector& s = Universe::getSectorAtLocation(xpos, ypos);
+	if (s.sol.size() == 0)
+	{
+		return;
+	}
 	int randIdx = rand() % s.sol.size();
 	Compound &toReactWith = s.sol[randIdx];
 	int stability = 0;
@@ -114,7 +166,50 @@ void Organelle::DoChemistry(std::vector<Compound*>& reactants)
 		{
 			return;
 		}
-
+		if (structure.mass == 0)
+		{
+			reactants.emplace_back(&toReactWith);
+		}
+		else
+		{
+			int numPieces;
+			Compound* pieces = structure.SplitCompound(ielem1, numPieces);
+			if(pieces == nullptr){
+				reactants.emplace_back(&structure);
+				reactants.emplace_back(&toReactWith);
+			}
+			else
+			{
+				int largest = -1;
+				int size = -1;
+				for (int i = 0; i < numPieces; i++)
+				{
+					if (pieces[i].mass > size)
+					{
+						largest = i;
+						size = pieces[i].mass;
+					}
+				}
+				structure = pieces[largest];
+				Compound temp = toReactWith;
+				FastDelete(s.sol, randIdx);
+				for (int i = 0; i < numPieces; i++)
+				{
+					if (i != largest)
+					{
+						s.sol.emplace_back(pieces[i]);
+					}
+				}
+				//note the unusual for loop indexing to avoid a later oboo
+				for (int i = 1; i < numPieces; i++)
+				{
+					reactants.emplace_back(&s.sol[s.sol.size()-i]);
+				}
+				reactants.emplace_back(&structure);
+				s.sol.emplace_back(temp);
+				reactants.emplace_back(&s.sol[s.sol.size() - 1]);
+			}
+		}
 	}
 	else //add to structure
 	{
@@ -122,9 +217,94 @@ void Organelle::DoChemistry(std::vector<Compound*>& reactants)
 		{
 			return;
 		}
-		
-	}
-	
+		if (toReactWith.mass == 0)
+		{
+			FastDelete(s.sol, randIdx);
+			reactants.emplace_back(&structure);
+		}
+		else
+		{
 
+			int numPieces;
+			Compound* pieces = toReactWith.SplitCompound(ielem1, numPieces);
+			if (pieces == nullptr)
+			{
+				reactants.emplace_back(&structure);
+				reactants.emplace_back(&toReactWith);
+			}
+			else
+			{
+				FastDelete(s.sol, randIdx);
+				for (int i = 0; i < numPieces; i++)
+				{
+					s.sol.emplace_back(pieces[i]);
+				}
+				//note the unusual for loop indexing to avoid a later oboo
+				for (int i = 1; i < numPieces+1; i++)
+				{
+					reactants.emplace_back(&s.sol[s.sol.size() - i]);
+				}
+				reactants.emplace_back(&structure);
+			}
+		}
+	}
+	AdjustEnergyValues(stability, reactants);
 	reactants.clear();
+}
+
+bool Organelle::IsAlive()
+{
+	Element e = GetCriticalCharge();
+	if (e.red == -1)
+	{
+		return false;
+	}
+	//as red increases (and therefore so does mass and size), so does the tolerance for damage
+	int threshold = CriticalIdentity.red / 4;
+	if (abs(e.red - CriticalIdentity.red) > threshold)
+	{
+		return false;
+	}
+	if (abs(e.blue - CriticalIdentity.blue) > threshold)
+	{
+		return false;
+	}
+	if (abs(e.green - CriticalIdentity.green) > threshold)
+	{
+		return false;
+	}
+	return true;
+}
+
+Element Organelle::GetCriticalCharge()
+{
+	Element ret = Element();
+	if (structure.composition.size() < criticalRegion)
+	{
+		ret.red = -1;
+		return ret;
+	}
+	for (int i = 0; i < criticalRegion; i++)
+	{
+		const Element& e = structure.composition[i];
+		if (e.red != 0)
+		{
+			ret.red += e.red;
+			ret.blue += e.blue;
+			ret.green += e.green;
+		}
+	}
+	return ret;
+}
+
+void Organelle::CheckConnectionDeath(std::list<Organelle*>& border)
+{
+	for (Organelle* o : connections)
+	{
+		if (o->UtilityMarker == 0)
+		{
+			o->UtilityMarker = 2;
+			border.push_back(o);
+		}
+	}
 }

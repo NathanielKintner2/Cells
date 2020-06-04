@@ -16,6 +16,16 @@ public:
 
 	char name; //just an indentifier
 
+	Element() 
+	{
+		red = 0;
+		green = 0;
+		blue = 0;
+		currentGreen = 0;
+		currentBlue = 0;
+		name = 0;
+	};
+
 	int GetInstability();
 };
 
